@@ -50,13 +50,21 @@ public class GameSetup
             Undo.RegisterCreatedObjectUndo(gameContainerGO, "Create Game Container");
         }
 
-        // 5. Setup DynamicViewport for GameContainer
+        // 5. Setup DynamicViewport and RectMask2D for GameContainer
         DynamicViewport viewport = gameContainerGO.GetComponent<DynamicViewport>();
         if (viewport == null)
         {
             viewport = gameContainerGO.AddComponent<DynamicViewport>();
             Undo.RegisterCreatedObjectUndo(viewport, "Add DynamicViewport Component");
         }
+        
+        RectMask2D mask = gameContainerGO.GetComponent<RectMask2D>();
+        if (mask == null)
+        {
+            mask = gameContainerGO.AddComponent<RectMask2D>();
+            Undo.RegisterCreatedObjectUndo(mask, "Add RectMask2D Component");
+        }
+
         viewport.UpdateLayout();
 
         // 6. Add an Image for visualization

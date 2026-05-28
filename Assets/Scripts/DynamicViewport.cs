@@ -1,7 +1,9 @@
 using UnityEngine;
+using UnityEngine.UI;
 
 [ExecuteAlways]
 [RequireComponent(typeof(RectTransform))]
+[RequireComponent(typeof(RectMask2D))]
 public class DynamicViewport : MonoBehaviour
 {
     [Tooltip("Percentage of the screen height the game viewport should occupy (0.0 to 1.0)")]
@@ -16,6 +18,7 @@ public class DynamicViewport : MonoBehaviour
     private void Awake()
     {
         rectTransform = GetComponent<RectTransform>();
+        EnsureMaskComponent();
         UpdateLayout();
     }
 
@@ -25,7 +28,16 @@ public class DynamicViewport : MonoBehaviour
         {
             rectTransform = GetComponent<RectTransform>();
         }
+        EnsureMaskComponent();
         UpdateLayout();
+    }
+
+    private void EnsureMaskComponent()
+    {
+        if (GetComponent<RectMask2D>() == null)
+        {
+            gameObject.AddComponent<RectMask2D>();
+        }
     }
 
     private void Update()
