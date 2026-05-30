@@ -1,0 +1,167 @@
+# Strict Antigravity ignore rules for Unity project
+# This file prevents the Antigravity agent from scanning, reading, or indexing 
+# heavy binary files, cache folders, and auto-generated editor artifacts.
+
+# ==========================================
+# 1. Unity Temp & Cache Directories
+# ==========================================
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+/ExportedObj/
+.gradle/
+
+# ==========================================
+# 2. Build & Packaging Artifacts
+# ==========================================
+/[Bb]uild/
+/[Bb]uilds/
+*.apk
+*.aab
+*.unitypackage
+*.app
+*.ipa
+*.dmg
+*.msi
+*.exe
+
+# ==========================================
+# 3. IDE / Compiler Artifacts & Cache
+# ==========================================
+.vs/
+.vscode/
+.idea/
+*.csproj
+*.sln
+*.suo
+*.user
+*.userprefs
+*.unityproj
+*.booproj
+*.tmp
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+sysinfo.txt
+crashlytics-build.properties
+
+# ==========================================
+# 4. Unity Meta Files
+# ==========================================
+# Ignore Unity metadata files to prevent token waste and search pollution
+*.meta
+
+# ==========================================
+# 5. Unity Binary & Serialization Assets
+# ==========================================
+# Since the agent cannot read or edit these directly, ignoring them saves performance
+*.unity
+*.prefab
+*.asset
+*.controller
+*.overrideController
+*.anim
+*.playable
+*.signal
+*.mask
+*.mat
+*.physicMaterial
+*.physicsMaterial2D
+*.guiskin
+*.fontsettings
+
+# ==========================================
+# 6. Media, 3D Models, and Audio (Binaries)
+# ==========================================
+# Images & Textures
+*.png
+*.jpg
+*.jpeg
+*.tga
+*.psd
+*.tiff
+*.gif
+*.bmp
+*.exr
+*.hdr
+*.tif
+*.iff
+*.pict
+*.svg
+
+# 3D Models & Meshes
+*.fbx
+*.obj
+*.max
+*.blend
+*.ma
+*.mb
+*.3ds
+*.dae
+*.dxf
+*.ply
+*.stl
+
+# Audio Files
+*.mp3
+*.ogg
+*.wav
+*.aif
+*.aiff
+*.xm
+*.mod
+*.it
+*.s3m
+*.midi
+*.mid
+
+# Video Files
+*.mp4
+*.mov
+*.avi
+*.asf
+*.asx
+*.wmv
+*.m4v
+*.ogv
+
+# Fonts
+*.ttf
+*.otf
+*.ttc
+*.dfont
+*.woff
+*.woff2
+
+# Compressed Archives
+*.zip
+*.rar
+*.tar
+*.gz
+*.7z
+*.tgz
+
+# Compiled Libraries
+*.dll
+*.so
+*.dylib
+*.jar
+*.aar
+*.lib
+*.a
+
+# ==========================================
+# 7. Static / Third-Party Project Folders
+# ==========================================
+# These contain third-party scripts, assets, or tools that do not require editing.
+# Ignoring them prevents the agent from searching them during codebase queries.
+/Assets/TextMesh Pro/
+/Assets/ThirdParty/
+/Assets/CrazyOptimizer/
+/Assets/Plugins/Editor/JetBrains*
+/Assets/AssetStoreTools*
