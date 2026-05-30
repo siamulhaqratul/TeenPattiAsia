@@ -15,42 +15,37 @@ namespace CrazyGames.TreeLib
 
         public int depth
         {
-            get { return m_Depth; }
-            set { m_Depth = value; }
+            get => m_Depth;
+            set => m_Depth = value;
         }
 
         public TreeElement parent
         {
-            get { return m_Parent; }
-            set { m_Parent = value; }
+            get => m_Parent;
+            set => m_Parent = value;
         }
 
         public List<TreeElement> children
         {
-            get { return m_Children; }
-            set { m_Children = value; }
+            get => m_Children;
+            set => m_Children = value;
         }
 
-        public bool hasChildren
-        {
-            get { return children != null && children.Count > 0; }
-        }
+        public bool hasChildren => m_Children != null && m_Children.Count > 0;
 
         public string name
         {
-            get { return m_Name; }
-            set { m_Name = value; }
+            get => m_Name;
+            set => m_Name = value;
         }
 
-        public int id
+        public int Id
         {
-            get { return m_ID; }
-            set { m_ID = value; }
+            get => m_ID;
+            set => m_ID = value;
         }
 
-        public TreeElement()
-        {
-        }
+        public TreeElement() { }
 
         public TreeElement(string name, int depth, int id)
         {

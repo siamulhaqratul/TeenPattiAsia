@@ -1,24 +1,21 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEditor;
 
 namespace CrazyGames
 {
-    public class OptimizerUtils
+    public static class OptimizerUtils
     {
-        /**
-         * Find the paths of the scenes that will end up in the final build of the game.
-         */
-        public static List<string> GetScenesInBuildPath()
+        /// <summary>
+        /// Returns the paths of the scenes that will be included in the final build.
+        /// </summary>
+        public static IReadOnlyList<string> GetScenesInBuildPath()
         {
             var scenesInBuild = new List<string>();
             foreach (var scene in EditorBuildSettings.scenes)
             {
                 if (scene.enabled)
-                {
                     scenesInBuild.Add(scene.path);
-                }
             }
-
             return scenesInBuild;
         }
     }

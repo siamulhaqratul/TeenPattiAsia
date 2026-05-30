@@ -16,7 +16,6 @@ public static class AddMCPForUnityPackage
     static readonly string ManifestPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Packages", "manifest.json"));
 
     static AddRequest sAddRequest;
-    static bool sHookedUpdate;
 
     static AddMCPForUnityPackage()
     {
@@ -52,12 +51,11 @@ public static class AddMCPForUnityPackage
 
     static bool IsInManifest()
     {
-        // Simple and reliable: check manifest.json synchronously
         if (!File.Exists(ManifestPath))
             return false;
 
         var text = File.ReadAllText(ManifestPath);
-        return text.Contains("\"" + PACKAGE_NAME + "\"");
+        return text.Contains($"\"{PACKAGE_NAME}\"");
     }
 
     static void StartAdd()
@@ -66,37 +64,20 @@ public static class AddMCPForUnityPackage
             return;
 
         sAddRequest = Client.Add(GIT_URL);
-
-        if (!sHookedUpdate)
-        {
-            sHookedUpdate = true;
-            EditorApplication.update += OnUpdate;
-        }
+        EditorApplication.update += OnUpdate;
     }
 
     static void OnUpdate()
     {
-        if (sAddRequest == null)
-            return;
-
-        if (!sAddRequest.IsCompleted)
+        if (sAddRequest == null || !sAddRequest.IsCompleted)
             return;
 
         if (sAddRequest.Status == StatusCode.Success)
-        {
-            Debug.Log("MCP for Unity installed: " + sAddRequest.Result.name + "@" + sAddRequest.Result.version);
-        }
+            Debug.Log($"MCP for Unity installed: {sAddRequest.Result.name}@{sAddRequest.Result.version}");
         else
-        {
-            Debug.LogError("Failed to install MCP for Unity: " + (sAddRequest.Error != null ? sAddRequest.Error.message : "Unknown error"));
-        }
+            Debug.LogError($"Failed to install MCP for Unity: {sAddRequest.Error?.message ?? "Unknown error"}");
 
         sAddRequest = null;
-
-        if (sHookedUpdate)
-        {
-            sHookedUpdate = false;
-            EditorApplication.update -= OnUpdate;
-        }
+        EditorApplication.update -= OnUpdate;
     }
 }

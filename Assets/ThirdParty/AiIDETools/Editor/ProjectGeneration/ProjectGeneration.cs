@@ -209,7 +209,8 @@ namespace AntigravityEditor
 
         static bool ShouldSyncOnReimportedAsset(string asset)
         {
-            return k_ReimportSyncExtensions.Contains(new FileInfo(asset).Extension);
+            // Path.GetExtension avoids allocating a FileInfo object just to read the extension
+            return k_ReimportSyncExtensions.Contains(Path.GetExtension(asset));
         }
 
         private static IEnumerable<SR.MethodInfo> GetPostProcessorCallbacks(string name)
@@ -300,11 +301,8 @@ namespace AntigravityEditor
         bool IsSupportedExtension(string extension)
         {
             extension = extension.TrimStart('.');
-            if (k_BuiltinSupportedExtensions.ContainsKey(extension))
-                return true;
-            if (m_ProjectSupportedExtensions.Contains(extension))
-                return true;
-            return false;
+            return k_BuiltinSupportedExtensions.ContainsKey(extension)
+                || m_ProjectSupportedExtensions.Contains(extension);
         }
 
         static ScriptingLanguage ScriptingLanguageFor(Assembly assembly)
@@ -319,9 +317,8 @@ namespace AntigravityEditor
 
         static string GetExtensionOfSourceFile(string file)
         {
-            var ext = Path.GetExtension(file).ToLower();
-            ext = ext.Substring(1); //strip dot
-            return ext;
+            var ext = Path.GetExtension(file).ToLowerInvariant();
+            return ext.Substring(1); // strip leading dot
         }
 
         static ScriptingLanguage ScriptingLanguageFor(string extension)
@@ -808,8 +805,7 @@ namespace AntigravityEditor
 
     public static class SolutionGuidGenerator
     {
-        static MD5 mD5 = MD5CryptoServiceProvider.Create();
-
+        // MD5 is IDisposable and not thread-safe; create per-call to avoid resource leaks and races
         public static string GuidForProject(string projectName)
         {
             return ComputeGuidHashFor(projectName + "salt");
@@ -822,7 +818,8 @@ namespace AntigravityEditor
 
         static string ComputeGuidHashFor(string input)
         {
-            var hash = mD5.ComputeHash(Encoding.Default.GetBytes(input));
+            using var md5 = MD5.Create();
+            var hash = md5.ComputeHash(Encoding.Default.GetBytes(input));
             return new Guid(hash).ToString();
         }
     }

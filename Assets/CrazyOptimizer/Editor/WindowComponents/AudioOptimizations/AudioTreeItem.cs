@@ -1,5 +1,4 @@
-﻿using CrazyGames.TreeLib;
-using System;
+using CrazyGames.TreeLib;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -11,30 +10,12 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
         public string AudioPath { get; }
         public string AudioName { get; }
 
-        public string LoadType
-        {
-            get
-            {
-                switch (_platformSettings.loadType)
-                {
-                    case AudioClipLoadType.DecompressOnLoad:
-                        return "Decompress on load";
-                    case AudioClipLoadType.CompressedInMemory:
-                        return "Compressed in memory";
-                    case AudioClipLoadType.Streaming:
-                        return "Streaming";
-                    default:
-                        throw new ArgumentOutOfRangeException();
-                }
-            }
-        }
+        // Resolved at construction time; no need to store the importer reference afterwards
+        public string LoadType { get; }
+        public int Quality { get; }
 
-        public int Quality => Mathf.RoundToInt(_platformSettings.quality * 100);
-
-        private readonly AudioImporter _audioImporter;
-        private readonly AudioImporterSampleSettings _platformSettings;
-
-        public AudioTreeItem(string name, int depth, int id, string audioPath, AudioImporter audioImporter) : base(name, depth, id)
+        public AudioTreeItem(string name, int depth, int id, string audioPath, AudioImporter audioImporter)
+            : base(name, depth, id)
         {
             if (depth == -1)
                 return;
@@ -42,8 +23,17 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
             AudioPath = audioPath;
             AudioName = Path.GetFileName(audioPath);
 
-            _audioImporter = audioImporter;
-            _platformSettings = _audioImporter.GetOverrideSampleSettings("WebGL");
+            var platformSettings = audioImporter.GetOverrideSampleSettings("WebGL");
+
+            LoadType = platformSettings.loadType switch
+            {
+                AudioClipLoadType.DecompressOnLoad => "Decompress on load",
+                AudioClipLoadType.CompressedInMemory => "Compressed in memory",
+                AudioClipLoadType.Streaming => "Streaming",
+                _ => platformSettings.loadType.ToString()
+            };
+
+            Quality = Mathf.RoundToInt(platformSettings.quality * 100);
         }
     }
 }

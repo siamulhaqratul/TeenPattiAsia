@@ -1,9 +1,8 @@
-﻿using CrazyGames.WindowComponents;
+using CrazyGames.WindowComponents;
+using CrazyGames.WindowComponents.AudioOptimizations;
 using CrazyGames.WindowComponents.ModelOptimizations;
 using CrazyGames.WindowComponents.TextureOptimizations;
 using CrazyOptimizer.Editor.WindowComponents.BuildLogs;
-using System;
-using CrazyGames.WindowComponents.AudioOptimizations;
 using UnityEditor;
 using UnityEngine;
 
@@ -11,8 +10,9 @@ namespace CrazyGames
 {
     public class OptimizerWindow : EditorWindow
     {
-        private int _toolbarInt = 0;
+        private int _toolbarInt;
         private readonly string[] _toolbarStrings = { "Export", "Textures", "Models", "Audio clips", "Build logs", "About" };
+
         public static EditorWindow EditorWindowInstance;
 
         [MenuItem("Tools/WebGL Optimizer")]
@@ -29,24 +29,12 @@ namespace CrazyGames
             _toolbarInt = GUILayout.Toolbar(_toolbarInt, _toolbarStrings);
             switch (_toolbarInt)
             {
-                case 0:
-                    ExportOptimizations.RenderGUI();
-                    break;
-                case 1:
-                    TextureOptimization.RenderGUI();
-                    break;
-                case 2:
-                    ModelOptimization.RenderGUI();
-                    break;
-                case 3:
-                    AudioOptimization.RenderGUI();
-                    break;
-                case 4:
-                    BuildLogs.RenderGUI();
-                    break;
-                case 5:
-                    About.RenderGUI();
-                    break;
+                case 0: ExportOptimizations.RenderGUI(); break;
+                case 1: TextureOptimization.RenderGUI(); break;
+                case 2: ModelOptimization.RenderGUI();   break;
+                case 3: AudioOptimization.RenderGUI();   break;
+                case 4: BuildLogs.RenderGUI();           break;
+                case 5: About.RenderGUI();               break;
             }
 
             GUILayout.Space(50);
@@ -56,8 +44,8 @@ namespace CrazyGames
 
         void RenderCredits()
         {
-            // don't render the about section when the package is integrated in CrazySDK
-            if (Type.GetType("CrazyGames.SiteLock") != null)
+            // Don't render the about section when the package is integrated in CrazySDK
+            if (System.Type.GetType("CrazyGames.SiteLock") != null)
                 return;
 
             EditorGUILayout.BeginHorizontal();

@@ -1,5 +1,4 @@
-﻿using CrazyGames.TreeLib;
-using System;
+using CrazyGames.TreeLib;
 using System.IO;
 using UnityEditor;
 
@@ -10,37 +9,18 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
         public string TexturePath { get; }
         public string TextureName { get; }
 
-        public int TextureMaxSize => _platformSettings.maxTextureSize;
-        public int CrunchCompressionQuality => _platformSettings.compressionQuality;
-        public bool HasCrunchCompression => _textureImporter.crunchedCompression;
-        public TextureImporterFormat TextureFormat => _platformSettings.format;
-        public TextureImporterType TextureType => _textureImporter.textureType;
-        public TextureImporterCompression TextureCompression => _textureImporter.textureCompression;
+        // All importer values captured once at construction to avoid repeated
+        // cross-boundary calls on every sort pass and every rendered row.
+        public TextureImporterType TextureType { get; }
+        public TextureImporterCompression TextureCompression { get; }
+        public TextureImporterFormat TextureFormat { get; }
+        public int TextureMaxSize { get; }
+        public bool HasCrunchCompression { get; }
+        public int CrunchCompressionQuality { get; }
+        public string TextureCompressionName { get; }
 
-        public string TextureCompressionName
-        {
-            get
-            {
-                switch (TextureCompression)
-                {
-                    case TextureImporterCompression.Uncompressed:
-                        return "Uncompressed";
-                    case TextureImporterCompression.Compressed:
-                        return "Normal";
-                    case TextureImporterCompression.CompressedHQ:
-                        return "High";
-                    case TextureImporterCompression.CompressedLQ:
-                        return "Low";
-                    default:
-                        throw new ArgumentOutOfRangeException();
-                }
-            }
-        }
-
-        private readonly TextureImporter _textureImporter;
-        private readonly TextureImporterPlatformSettings _platformSettings;
-
-        public TextureTreeItem(string name, int depth, int id, string texturePath, TextureImporter textureImporter) : base(name, depth, id)
+        public TextureTreeItem(string name, int depth, int id, string texturePath, TextureImporter textureImporter)
+            : base(name, depth, id)
         {
             if (depth == -1)
                 return;
@@ -48,8 +28,23 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
             TexturePath = texturePath;
             TextureName = Path.GetFileName(texturePath);
 
-            _textureImporter = textureImporter;
-            _platformSettings = _textureImporter.GetPlatformTextureSettings("WebGL");
+            var platformSettings = textureImporter.GetPlatformTextureSettings("WebGL");
+
+            TextureType             = textureImporter.textureType;
+            TextureCompression      = textureImporter.textureCompression;
+            TextureFormat           = platformSettings.format;
+            TextureMaxSize          = platformSettings.maxTextureSize;
+            HasCrunchCompression    = textureImporter.crunchedCompression;
+            CrunchCompressionQuality = platformSettings.compressionQuality;
+
+            TextureCompressionName = textureImporter.textureCompression switch
+            {
+                TextureImporterCompression.Uncompressed  => "Uncompressed",
+                TextureImporterCompression.Compressed    => "Normal",
+                TextureImporterCompression.CompressedHQ  => "High",
+                TextureImporterCompression.CompressedLQ  => "Low",
+                _                                        => textureImporter.textureCompression.ToString()
+            };
         }
     }
 }

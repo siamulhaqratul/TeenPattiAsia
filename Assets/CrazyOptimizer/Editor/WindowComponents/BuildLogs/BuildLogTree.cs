@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using CrazyGames.TreeLib;
@@ -10,7 +10,8 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
 {
     class BuildLogTree : TreeViewWithTreeModel<BuildLogTreeItem>
     {
-        public BuildLogTree(TreeViewState treeViewState, MultiColumnHeader multiColumnHeader, TreeModel<BuildLogTreeItem> model)
+        public BuildLogTree(TreeViewState treeViewState, MultiColumnHeader multiColumnHeader,
+            TreeModel<BuildLogTreeItem> model)
             : base(treeViewState, multiColumnHeader, model)
         {
             showBorder = true;
@@ -25,33 +26,25 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
                 return;
 
             if (multiColumnHeader.sortedColumnIndex == -1)
-            {
                 return; // No column to sort for (just use the order the data are in)
-            }
-
 
             var sortedColumns = multiColumnHeader.state.sortedColumns;
-
             if (sortedColumns.Length == 0)
                 return;
 
-            var items = rootItem.children.Cast<TreeViewItem<BuildLogTreeItem>>().OrderBy(i => i.data.size);
             var sortedColumnIndex = sortedColumns[0];
             var ascending = multiColumnHeader.IsSortedAscending(sortedColumnIndex);
-            switch (sortedColumnIndex)
-            {
-                case 0:
-                    items = items.Order(i => i.data.sizeInBytes, ascending);
-                    break;
-                case 1:
-                    items = items.Order(i => i.data.sizePercentage, ascending);
-                    break;
-                case 2:
-                    items = items.Order(i => i.data.filePath, ascending);
-                    break;
-            }
 
-            rootItem.children = items.Cast<TreeViewItem>().ToList();
+            // Cast once; the original pre-sort on size was immediately overwritten — removed.
+            IOrderedEnumerable<TreeViewItem<BuildLogTreeItem>> sorted = sortedColumnIndex switch
+            {
+                0 => rootItem.children.Cast<TreeViewItem<BuildLogTreeItem>>().Order(i => i.data.sizeInBytes, ascending),
+                1 => rootItem.children.Cast<TreeViewItem<BuildLogTreeItem>>().Order(i => i.data.sizePercentage, ascending),
+                2 => rootItem.children.Cast<TreeViewItem<BuildLogTreeItem>>().Order(i => i.data.filePath, ascending),
+                _ => rootItem.children.Cast<TreeViewItem<BuildLogTreeItem>>().Order(i => i.data.sizeInBytes, ascending)
+            };
+
+            rootItem.children = sorted.Cast<TreeViewItem>().ToList();
             TreeToList(root, rows);
             Repaint();
         }
@@ -59,16 +52,16 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
         public static void TreeToList(TreeViewItem root, IList<TreeViewItem> result)
         {
             if (root == null)
-                throw new NullReferenceException("root");
+                throw new ArgumentNullException(nameof(root));
             if (result == null)
-                throw new NullReferenceException("result");
+                throw new ArgumentNullException(nameof(result));
 
             result.Clear();
 
             if (root.children == null)
                 return;
 
-            Stack<TreeViewItem> stack = new Stack<TreeViewItem>();
+            Stack<TreeViewItem> stack = new();
             for (int i = root.children.Count - 1; i >= 0; i--)
                 stack.Push(root.children[i]);
 
@@ -80,13 +73,10 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
                 if (current.hasChildren && current.children[0] != null)
                 {
                     for (int i = current.children.Count - 1; i >= 0; i--)
-                    {
                         stack.Push(current.children[i]);
-                    }
                 }
             }
         }
-
 
         void OnSortingChanged(MultiColumnHeader multiColumnHeader)
         {
@@ -102,15 +92,12 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
 
         protected override void RowGUI(RowGUIArgs args)
         {
-            var item = (TreeViewItem<BuildLogTreeItem>) args.item;
-
+            var item = (TreeViewItem<BuildLogTreeItem>)args.item;
             for (int i = 0; i < args.GetNumVisibleColumns(); ++i)
-            {
                 CellGUI(args.GetCellRect(i), item, args.GetColumn(i), ref args);
-            }
         }
 
-        private void CellGUI(Rect cellRect, TreeViewItem<BuildLogTreeItem> item, int column, ref RowGUIArgs args)
+        void CellGUI(Rect cellRect, TreeViewItem<BuildLogTreeItem> item, int column, ref RowGUIArgs args)
         {
             CenterRectUsingSingleLineHeight(ref cellRect);
             switch (column)
@@ -130,7 +117,14 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
         protected override void SelectionChanged(IList<int> selectedIds)
         {
             base.SelectionChanged(selectedIds);
-            var item = treeModel.Find(selectedIds.First());
+
+            if (selectedIds.Count == 0)
+                return;
+
+            var item = treeModel.Find(selectedIds[0]);
+            if (item == null)
+                return;
+
             Selection.activeObject = AssetDatabase.LoadMainAssetAtPath(item.filePath);
         }
     }

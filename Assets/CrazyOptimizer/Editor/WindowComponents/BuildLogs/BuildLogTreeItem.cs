@@ -1,7 +1,4 @@
-﻿using System;
-using System.IO;
 using CrazyGames.TreeLib;
-using UnityEditor;
 
 namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
 {
@@ -12,31 +9,26 @@ namespace CrazyOptimizer.Editor.WindowComponents.BuildLogs
         public readonly float sizePercentage;
         public readonly string filePath;
 
-        public float sizeInBytes
-        {
-            get
-            {
-                switch (sizeUnit)
-                {
-                    case "kb":
-                        return size * 1024;
-                    case "mb":
-                        return size * 1024 * 1024;
-                    default:
-                        throw new Exception("Unknown size unit " + sizeUnit);
-                }
-            }
-        }
+        // Computed once at construction; avoids switch overhead on every sort/render pass
+        public readonly float sizeInBytes;
 
-
-        public BuildLogTreeItem(string name, int depth, int id, float size, string sizeUnit, float sizePercentage, string filePath) : base(name, depth, id)
+        public BuildLogTreeItem(string name, int depth, int id, float size, string sizeUnit, float sizePercentage,
+            string filePath) : base(name, depth, id)
         {
             if (depth == -1)
                 return;
+
             this.size = size;
             this.sizeUnit = sizeUnit;
             this.sizePercentage = sizePercentage;
             this.filePath = filePath;
+
+            sizeInBytes = sizeUnit switch
+            {
+                "kb" => size * 1024f,
+                "mb" => size * 1024f * 1024f,
+                _ => throw new System.ArgumentOutOfRangeException(nameof(sizeUnit), $"Unknown size unit: '{sizeUnit}'")
+            };
         }
     }
 }

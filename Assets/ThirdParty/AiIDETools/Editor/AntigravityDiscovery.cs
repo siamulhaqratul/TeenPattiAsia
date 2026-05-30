@@ -79,43 +79,23 @@ namespace AntigravityEditor
 
             if (installations.Count == 0) return;
 
-            // Handle duplicates and prefix paths if multiple versions exist
-            var distinctPaths = installations
+            // Deduplicate by path, then project directly to CodeEditor.Installation in one chain
+            m_Installations = installations
                 .GroupBy(i => i.Path)
-                .Select(g => g.First())
+                .Select(g => new CodeEditor.Installation { Name = g.First().Name, Path = g.Key })
                 .ToList();
-
-            if (distinctPaths.Count == 1)
-            {
-                m_Installations = new List<CodeEditor.Installation>
-                {
-                    new CodeEditor.Installation { Name = distinctPaths[0].Name, Path = distinctPaths[0].Path }
-                };
-                return;
-            }
-
-            m_Installations = distinctPaths.Select(i => new CodeEditor.Installation
-            {
-                Name = i.Name,
-                Path = i.Path
-            }).ToList();
         }
 
         void AddIfExists(List<(string Name, string Path)> installations, string name, string path)
         {
             if (string.IsNullOrEmpty(path)) return;
-            
-            bool exists = false;
-#if UNITY_EDITOR_OSX
-            exists = Directory.Exists(path);
-#else
-            exists = File.Exists(path);
-#endif
 
-            if (exists)
-            {
+#if UNITY_EDITOR_OSX
+            if (Directory.Exists(path))
+#else
+            if (File.Exists(path))
+#endif
                 installations.Add((name, path));
-            }
         }
     }
 }

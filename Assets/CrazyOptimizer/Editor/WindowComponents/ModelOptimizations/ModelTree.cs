@@ -10,7 +10,8 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
 {
     class ModelTree : TreeViewWithTreeModel<ModelTreeItem>
     {
-        public ModelTree(TreeViewState treeViewState, MultiColumnHeader multiColumnHeader, TreeModel<ModelTreeItem> model)
+        public ModelTree(TreeViewState treeViewState, MultiColumnHeader multiColumnHeader,
+            TreeModel<ModelTreeItem> model)
             : base(treeViewState, multiColumnHeader, model)
         {
             showBorder = true;
@@ -25,42 +26,28 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
                 return;
 
             if (multiColumnHeader.sortedColumnIndex == -1)
-            {
                 return; // No column to sort for (just use the order the data are in)
-            }
 
             var sortedColumns = multiColumnHeader.state.sortedColumns;
-
             if (sortedColumns.Length == 0)
                 return;
 
-            var items = rootItem.children.Cast<TreeViewItem<ModelTreeItem>>().OrderBy(i => i.data.ModelName);
             var sortedColumnIndex = sortedColumns[0];
             var ascending = multiColumnHeader.IsSortedAscending(sortedColumnIndex);
 
-            switch (sortedColumnIndex)
+            // Cast once; the original pre-sort by ModelName was immediately overwritten — removed.
+            IOrderedEnumerable<TreeViewItem<ModelTreeItem>> sorted = sortedColumnIndex switch
             {
-                case 0:
-                    items = items.Order(i => i.data.ModelName, ascending);
-                    break;
-                case 1:
-                    items = items.Order(i => i.data.IsReadWriteEnabled, ascending);
-                    break;
-                case 2:
-                    items = items.Order(i => i.data.ArePolygonsOptimized, ascending);
-                    break;
-                case 3:
-                    items = items.Order(i => i.data.AreVerticesOptimized, ascending);
-                    break;
-                case 4:
-                    items = items.Order(i => i.data.MeshCompression, ascending);
-                    break;
-                case 5:
-                    items = items.Order(i => i.data.AnimationCompression, ascending);
-                    break;
-            }
+                0 => rootItem.children.Cast<TreeViewItem<ModelTreeItem>>().Order(i => i.data.ModelName, ascending),
+                1 => rootItem.children.Cast<TreeViewItem<ModelTreeItem>>().Order(i => i.data.IsReadWriteEnabled, ascending),
+                2 => rootItem.children.Cast<TreeViewItem<ModelTreeItem>>().Order(i => i.data.ArePolygonsOptimized, ascending),
+                3 => rootItem.children.Cast<TreeViewItem<ModelTreeItem>>().Order(i => i.data.AreVerticesOptimized, ascending),
+                4 => rootItem.children.Cast<TreeViewItem<ModelTreeItem>>().Order(i => i.data.MeshCompression, ascending),
+                5 => rootItem.children.Cast<TreeViewItem<ModelTreeItem>>().Order(i => i.data.AnimationCompression, ascending),
+                _ => rootItem.children.Cast<TreeViewItem<ModelTreeItem>>().Order(i => i.data.ModelName, ascending)
+            };
 
-            rootItem.children = items.Cast<TreeViewItem>().ToList();
+            rootItem.children = sorted.Cast<TreeViewItem>().ToList();
             TreeToList(root, rows);
             Repaint();
         }
@@ -68,17 +55,16 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
         public static void TreeToList(TreeViewItem root, IList<TreeViewItem> result)
         {
             if (root == null)
-                throw new NullReferenceException("root");
+                throw new ArgumentNullException(nameof(root));
             if (result == null)
-                throw new NullReferenceException("result");
+                throw new ArgumentNullException(nameof(result));
 
             result.Clear();
 
             if (root.children == null)
                 return;
 
-            Stack<TreeViewItem> stack = new Stack<TreeViewItem>();
-
+            Stack<TreeViewItem> stack = new();
             for (int i = root.children.Count - 1; i >= 0; i--)
                 stack.Push(root.children[i]);
 
@@ -90,9 +76,7 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
                 if (current.hasChildren && current.children[0] != null)
                 {
                     for (int i = current.children.Count - 1; i >= 0; i--)
-                    {
                         stack.Push(current.children[i]);
-                    }
                 }
             }
         }
@@ -112,14 +96,11 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
         protected override void RowGUI(RowGUIArgs args)
         {
             var item = (TreeViewItem<ModelTreeItem>)args.item;
-
             for (int i = 0; i < args.GetNumVisibleColumns(); ++i)
-            {
                 CellGUI(args.GetCellRect(i), item, args.GetColumn(i), ref args);
-            }
         }
 
-        private void CellGUI(Rect cellRect, TreeViewItem<ModelTreeItem> item, int column, ref RowGUIArgs args)
+        void CellGUI(Rect cellRect, TreeViewItem<ModelTreeItem> item, int column, ref RowGUIArgs args)
         {
             CenterRectUsingSingleLineHeight(ref cellRect);
             switch (column)
@@ -148,7 +129,14 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
         protected override void SelectionChanged(IList<int> selectedIds)
         {
             base.SelectionChanged(selectedIds);
-            var item = treeModel.Find(selectedIds.First());
+
+            if (selectedIds.Count == 0)
+                return;
+
+            var item = treeModel.Find(selectedIds[0]);
+            if (item == null)
+                return;
+
             Selection.activeObject = AssetDatabase.LoadMainAssetAtPath(item.ModelPath);
         }
     }

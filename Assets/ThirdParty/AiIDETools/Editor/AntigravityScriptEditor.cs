@@ -49,7 +49,7 @@ namespace AntigravityEditor
 
         string Arguments
         {
-            get => m_Arguments ?? (m_Arguments = EditorPrefs.GetString(antigravity_argument, DefaultArgument));
+            get => m_Arguments ??= EditorPrefs.GetString(antigravity_argument, DefaultArgument);
             set
             {
                 m_Arguments = value;
@@ -86,53 +86,32 @@ namespace AntigravityEditor
             set => EditorPrefs.SetString(antigravity_extension, value);
         }
 
+        static string GetInstallationName(string lowerCasePath)
+        {
+            if (lowerCasePath.Contains("antigravity")) return "Antigravity";
+            if (lowerCasePath.Contains("cursor"))      return "Cursor";
+            if (lowerCasePath.Contains("windsurf"))    return "Windsurf";
+            if (lowerCasePath.Contains("code"))        return "Visual Studio Code";
+            return "Antigravity/Cursor/Windsurf";
+        }
+
         public bool TryGetInstallationForPath(string editorPath, out CodeEditor.Installation installation)
         {
             var lowerCasePath = editorPath.ToLower();
             var filename = Path.GetFileName(lowerCasePath).Replace(" ", "");
             var installations = Installations;
-            
+
             if (!k_SupportedFileNames.Any(supported => filename.Contains(supported)))
             {
                 installation = default;
                 return false;
             }
 
-            if (!installations.Any())
-            {
-                string name = "Antigravity/Cursor/Windsurf";
-                if (lowerCasePath.Contains("antigravity")) name = "Antigravity";
-                else if (lowerCasePath.Contains("cursor")) name = "Cursor";
-                else if (lowerCasePath.Contains("windsurf")) name = "Windsurf";
-                else if (lowerCasePath.Contains("code")) name = "Visual Studio Code";
-
-                installation = new CodeEditor.Installation
-                {
-                    Name = name,
-                    Path = editorPath
-                };
-            }
-            else
-            {
-                try
-                {
-                    installation = installations.First(inst => inst.Path == editorPath);
-                }
-                catch (InvalidOperationException)
-                {
-                    string name = "Antigravity/Cursor/Windsurf";
-                    if (lowerCasePath.Contains("antigravity")) name = "Antigravity";
-                    else if (lowerCasePath.Contains("cursor")) name = "Cursor";
-                    else if (lowerCasePath.Contains("windsurf")) name = "Windsurf";
-                    else if (lowerCasePath.Contains("code")) name = "Visual Studio Code";
-
-                    installation = new CodeEditor.Installation
-                    {
-                        Name = name,
-                        Path = editorPath
-                    };
-                }
-            }
+            // Try to find a known installation; fall back to a synthesised entry if not registered yet
+            var matched = installations.FirstOrDefault(inst => inst.Path == editorPath);
+            installation = matched.Path != null
+                ? matched
+                : new CodeEditor.Installation { Name = GetInstallationName(lowerCasePath), Path = editorPath };
 
             return true;
         }
@@ -164,12 +143,10 @@ namespace AntigravityEditor
 
         void RegenerateProjectFiles()
         {
-            var rect = EditorGUI.IndentedRect(EditorGUILayout.GetControlRect(new GUILayoutOption[] { }));
+            var rect = EditorGUI.IndentedRect(EditorGUILayout.GetControlRect(Array.Empty<GUILayoutOption>()));
             rect.width = 252;
             if (GUI.Button(rect, "Regenerate project files"))
-            {
                 m_ProjectGeneration.Sync();
-            }
         }
 
         void SettingsButton(ProjectGenerationFlag preference, string guiMessage, string toolTip)

@@ -17,10 +17,11 @@ namespace AntigravityEditor
 
             if (Path.DirectorySeparatorChar == WinSeparator)
                 path = path.Replace(UnixSeparator, WinSeparator);
-            if (Path.DirectorySeparatorChar == UnixSeparator)
+            else if (Path.DirectorySeparatorChar == UnixSeparator)
                 path = path.Replace(WinSeparator, UnixSeparator);
 
-            return path.Replace(string.Concat(WinSeparator, WinSeparator), WinSeparator.ToString());
+            // Collapse any double-backslash sequences that may result from the replacements
+            return path.Replace(@"\\", WinSeparator.ToString());
         }
     }
 }

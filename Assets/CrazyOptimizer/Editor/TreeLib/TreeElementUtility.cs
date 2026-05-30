@@ -4,17 +4,16 @@ using System.Collections.Generic;
 namespace CrazyGames.TreeLib
 {
     // TreeElementUtility and TreeElement are useful helper classes for backend tree data structures.
-    // See tests at the bottom for examples of how to use.
 
     public static class TreeElementUtility
     {
         public static void TreeToList<T>(T root, IList<T> result) where T : TreeElement
         {
             if (result == null)
-                throw new NullReferenceException("The input 'IList<T> result' list is null");
+                throw new ArgumentNullException(nameof(result), "The input 'IList<T> result' list is null");
             result.Clear();
 
-            Stack<T> stack = new Stack<T>();
+            Stack<T> stack = new();
             stack.Push(root);
 
             while (stack.Count > 0)
@@ -22,19 +21,17 @@ namespace CrazyGames.TreeLib
                 T current = stack.Pop();
                 result.Add(current);
 
-                if (current.children != null && current.children.Count > 0)
+                if (current.children != null)
                 {
                     for (int i = current.children.Count - 1; i >= 0; i--)
-                    {
-                        stack.Push((T) current.children[i]);
-                    }
+                        stack.Push((T)current.children[i]);
                 }
             }
         }
 
         // Returns the root of the tree parsed from the list (always the first element).
-        // Important: the first item and is required to have a depth value of -1. 
-        // The rest of the items should have depth >= 0. 
+        // Important: the first item is required to have a depth value of -1.
+        // The rest of the items should have depth >= 0.
         public static T ListToTree<T>(IList<T> list) where T : TreeElement
         {
             // Validate input
@@ -51,14 +48,13 @@ namespace CrazyGames.TreeLib
             for (int parentIndex = 0; parentIndex < list.Count; parentIndex++)
             {
                 var parent = list[parentIndex];
-                bool alreadyHasValidChildren = parent.children != null;
-                if (alreadyHasValidChildren)
+                if (parent.children != null)
                     continue;
 
                 int parentDepth = parent.depth;
                 int childCount = 0;
 
-                // Count children based depth value, we are looking at children until it's the same depth as this object
+                // Count children based on depth value; stop when we return to same or lesser depth
                 for (int i = parentIndex + 1; i < list.Count; i++)
                 {
                     if (list[i].depth == parentDepth + 1)
@@ -67,19 +63,17 @@ namespace CrazyGames.TreeLib
                         break;
                 }
 
-                // Fill child array
+                // Fill child list
                 List<TreeElement> childList = null;
                 if (childCount != 0)
                 {
-                    childList = new List<TreeElement>(childCount); // Allocate once
-                    childCount = 0;
+                    childList = new(childCount); // allocate once with known capacity
                     for (int i = parentIndex + 1; i < list.Count; i++)
                     {
                         if (list[i].depth == parentDepth + 1)
                         {
                             list[i].parent = parent;
                             childList.Add(list[i]);
-                            childCount++;
                         }
 
                         if (list[i].depth <= parentDepth)
@@ -97,41 +91,41 @@ namespace CrazyGames.TreeLib
         public static void ValidateDepthValues<T>(IList<T> list) where T : TreeElement
         {
             if (list.Count == 0)
-                throw new ArgumentException("list should have items, count is 0, check before calling ValidateDepthValues", "list");
+                throw new ArgumentException("list should have items, count is 0, check before calling ValidateDepthValues", nameof(list));
 
             if (list[0].depth != -1)
                 throw new ArgumentException(
-                    "list item at index 0 should have a depth of -1 (since this should be the hidden root of the tree). Depth is: " + list[0].depth, "list");
+                    "list item at index 0 should have a depth of -1 (since this should be the hidden root of the tree). Depth is: " + list[0].depth, nameof(list));
 
+            if (list.Count > 1 && list[1].depth != 0)
+                throw new ArgumentException("Input list item at index 1 is assumed to have a depth of 0", nameof(list));
+
+            // Single pass: check that depth never increases by more than 1 and that all non-root items have depth >= 0
             for (int i = 0; i < list.Count - 1; i++)
             {
                 int depth = list[i].depth;
                 int nextDepth = list[i + 1].depth;
+
                 if (nextDepth > depth && nextDepth - depth > 1)
                     throw new ArgumentException(string.Format(
-                        "Invalid depth info in input list. Depth cannot increase more than 1 per row. Index {0} has depth {1} while index {2} has depth {3}", i,
-                        depth, i + 1, nextDepth));
+                        "Invalid depth info in input list. Depth cannot increase more than 1 per row. Index {0} has depth {1} while index {2} has depth {3}",
+                        i, depth, i + 1, nextDepth));
+
+                if (i + 1 >= 1 && list[i + 1].depth < 0)
+                    throw new ArgumentException("Invalid depth value for item at index " + (i + 1) + ". Only the first item (the root) should have depth below 0.");
             }
-
-            for (int i = 1; i < list.Count; ++i)
-                if (list[i].depth < 0)
-                    throw new ArgumentException("Invalid depth value for item at index " + i + ". Only the first item (the root) should have depth below 0.");
-
-            if (list.Count > 1 && list[1].depth != 0)
-                throw new ArgumentException("Input list item at index 1 is assumed to have a depth of 0", "list");
         }
 
-
-        // For updating depth values below any given element e.g after reparenting elements
+        // For updating depth values below any given element e.g. after reparenting elements
         public static void UpdateDepthValues<T>(T root) where T : TreeElement
         {
             if (root == null)
-                throw new ArgumentNullException("root", "The root is null");
+                throw new ArgumentNullException(nameof(root), "The root is null");
 
             if (!root.hasChildren)
                 return;
 
-            Stack<TreeElement> stack = new Stack<TreeElement>();
+            Stack<TreeElement> stack = new();
             stack.Push(root);
             while (stack.Count > 0)
             {
@@ -147,16 +141,16 @@ namespace CrazyGames.TreeLib
             }
         }
 
-        // Returns true if there is an ancestor of child in the elements list
-        static bool IsChildOf<T>(T child, IList<T> elements) where T : TreeElement
+        // Returns true if any element in 'elements' is an ancestor of 'child'
+        static bool IsChildOf<T>(T child, HashSet<T> elementSet) where T : TreeElement
         {
-            while (child != null)
+            TreeElement current = child.parent;
+            while (current != null)
             {
-                child = (T) child.parent;
-                if (elements.Contains(child))
+                if (current is T t && elementSet.Contains(t))
                     return true;
+                current = current.parent;
             }
-
             return false;
         }
 
@@ -165,22 +159,15 @@ namespace CrazyGames.TreeLib
             if (elements.Count == 1)
                 return new List<T>(elements);
 
-            List<T> result = new List<T>(elements);
-            result.RemoveAll(g => IsChildOf(g, elements));
-            return result;
-        }
-    }
-
-
-    class TreeElementUtilityTests
-    {
-        class TestElement : TreeElement
-        {
-            public TestElement(string name, int depth)
+            // Build a HashSet for O(1) ancestor lookups instead of O(n) per Contains call
+            var elementSet = new HashSet<T>(elements);
+            var result = new List<T>();
+            foreach (var element in elements)
             {
-                this.name = name;
-                this.depth = depth;
+                if (!IsChildOf(element, elementSet))
+                    result.Add(element);
             }
+            return result;
         }
     }
 }

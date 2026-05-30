@@ -1,5 +1,4 @@
 using CrazyGames.TreeLib;
-using System;
 using System.IO;
 using UnityEditor;
 
@@ -10,55 +9,20 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
         public string ModelPath { get; }
         public string ModelName { get; }
 
-        public bool IsReadWriteEnabled => _modelImporter.isReadable;
-        public bool ArePolygonsOptimized => _modelImporter.optimizeMeshPolygons;
-        public bool AreVerticesOptimized => _modelImporter.optimizeMeshVertices;
-        public ModelImporterMeshCompression MeshCompression => _modelImporter.meshCompression;
-        public ModelImporterAnimationCompression AnimationCompression => _modelImporter.animationCompression;
+        // All importer values captured once at construction.
+        // Avoids repeated cross-boundary property calls on every sort/render pass.
+        public bool IsReadWriteEnabled { get; }
+        public bool ArePolygonsOptimized { get; }
+        public bool AreVerticesOptimized { get; }
+        public ModelImporterMeshCompression MeshCompression { get; }
+        public ModelImporterAnimationCompression AnimationCompression { get; }
 
-        public string MeshCompressionName
-        {
-            get
-            {
-                switch (MeshCompression)
-                {
-                    case ModelImporterMeshCompression.Off:
-                        return "Off";
-                    case ModelImporterMeshCompression.Low:
-                        return "Low";
-                    case ModelImporterMeshCompression.Medium:
-                        return "Medium";
-                    case ModelImporterMeshCompression.High:
-                        return "High";
-                    default:
-                        throw new ArgumentOutOfRangeException();
-                }
-            }
-        }
+        // Enum.ToString() already produces the correct display strings for both enums
+        public string MeshCompressionName { get; }
+        public string AnimationCompressionName { get; }
 
-        public string AnimationCompressionName
-        {
-            get
-            {
-                switch (AnimationCompression)
-                {
-                    case ModelImporterAnimationCompression.Off:
-                        return "Off";
-                    case ModelImporterAnimationCompression.KeyframeReduction:
-                        return "KeyframeReduction";
-                    case ModelImporterAnimationCompression.KeyframeReductionAndCompression:
-                        return "KeyframeReductionAndCompression";
-                    case ModelImporterAnimationCompression.Optimal:
-                        return "Optimal";
-                    default:
-                        throw new ArgumentOutOfRangeException();
-                }
-            }
-        }
-
-        private readonly ModelImporter _modelImporter;
-
-        public ModelTreeItem(string name, int depth, int id, string modelPath, ModelImporter modelImporter) : base(name, depth, id)
+        public ModelTreeItem(string name, int depth, int id, string modelPath, ModelImporter modelImporter)
+            : base(name, depth, id)
         {
             if (depth == -1)
                 return;
@@ -66,7 +30,15 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
             ModelPath = modelPath;
             ModelName = Path.GetFileName(modelPath);
 
-            _modelImporter = modelImporter;
+            IsReadWriteEnabled    = modelImporter.isReadable;
+            ArePolygonsOptimized  = modelImporter.optimizeMeshPolygons;
+            AreVerticesOptimized  = modelImporter.optimizeMeshVertices;
+            MeshCompression       = modelImporter.meshCompression;
+            AnimationCompression  = modelImporter.animationCompression;
+
+            // These enums have display-ready names; ToString() avoids a verbose switch
+            MeshCompressionName      = modelImporter.meshCompression.ToString();
+            AnimationCompressionName = modelImporter.animationCompression.ToString();
         }
     }
 }

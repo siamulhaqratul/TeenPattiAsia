@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -16,6 +16,10 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
 
         private static bool _isAnalyzing;
         private static bool _includeFilesFromPackages;
+
+        // Compiled once at class-load time; was being re-compiled on every analysis call
+        private static readonly Regex ResourcesPathRegex =
+            new(@"\w*(?<!Editor\/)Resources\/", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         public static void RenderGUI()
         {
@@ -54,7 +58,6 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
                 "This utility gives you an overview of the textures used in your project. By optimizing various settings, you will be able to considerably decrease your final build size. You can click on a texture to select it in the Project view. To find out more about how the tool finds the textures, please check our GitHub repo.",
                 EditorStyles.wordWrappedLabel);
 
-
             BuildExplanation("Max size",
                 "Decrease the max size as much as possible while the texture still looks good in game. You most likely don't need the default 2048 set by Unity.");
             BuildExplanation("Compression", "Lower quality will decrease the final build size.");
@@ -67,134 +70,98 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
         {
             EditorGUILayout.BeginHorizontal();
             GUILayout.Label(label, EditorStyles.boldLabel, GUILayout.Width(130));
-            GUILayout.Label(
-                explanation,
-                EditorStyles.wordWrappedLabel);
+            GUILayout.Label(explanation, EditorStyles.wordWrappedLabel);
             GUILayout.FlexibleSpace();
             EditorGUILayout.EndHorizontal();
         }
 
-        /**
-         * Find recursively the textures on which this scene depends.
-         */
-        static List<string> GetSceneTextureDependencies(string scenePath)
+        // Collect texture dependencies of a scene directly into the destination set
+        static void CollectSceneTextureDependencies(string scenePath, HashSet<string> result)
         {
-            var textureDependencies = new List<string>();
-            var assetDependencies = AssetDatabase.GetDependencies(scenePath, true);
-            foreach (var assetDependency in assetDependencies)
+            foreach (var dep in AssetDatabase.GetDependencies(scenePath, true))
             {
-                if (AssetDatabase.GetMainAssetTypeAtPath(assetDependency) == typeof(Texture2D))
-                {
-                    textureDependencies.Add(assetDependency);
-                }
+                if (AssetDatabase.GetMainAssetTypeAtPath(dep) == typeof(Texture2D))
+                    result.Add(dep);
             }
-
-            return textureDependencies;
         }
 
-        static List<string> GetUsedTexturesInBuildScenes()
+        static HashSet<string> GetUsedTexturesInBuildScenes()
+        {
+            var usedTexturePaths = new HashSet<string>();
+            foreach (var scenePath in OptimizerUtils.GetScenesInBuildPath())
+                CollectSceneTextureDependencies(scenePath, usedTexturePaths);
+            return usedTexturePaths;
+        }
+
+        // Get textures referenced by assets inside Resources folders (excluding Editor-only Resources).
+        static HashSet<string> GetUsedTexturesInResources()
         {
             var usedTexturePaths = new HashSet<string>();
 
-            var scenesInBuild = OptimizerUtils.GetScenesInBuildPath();
-            foreach (var scenePath in scenesInBuild)
+            var resourceAssets = AssetDatabase
+                .FindAssets("", new[] { "Assets" })
+                .Select(AssetDatabase.GUIDToAssetPath)
+                .Where(path => ResourcesPathRegex.IsMatch(path));
+
+            foreach (var assetPath in resourceAssets)
             {
-                var texturesUsedInScene = GetSceneTextureDependencies(scenePath);
-                foreach (var texturePath in texturesUsedInScene)
+                foreach (var dep in AssetDatabase.GetDependencies(assetPath, true))
                 {
-                    usedTexturePaths.Add(texturePath);
+                    if (AssetDatabase.GetMainAssetTypeAtPath(dep) == typeof(Texture2D))
+                        usedTexturePaths.Add(dep);
                 }
             }
 
-            return usedTexturePaths.ToList();
-        }
-
-        /**
-         * Get the list of textures in the Resources folders, or on which assets from the Resources folder depend.
-         */
-        static List<string> GetUsedTexturesInResources()
-        {
-            var usedTexturePaths = new HashSet<string>();
-            var allAssetPaths = AssetDatabase.FindAssets("", new[] {"Assets"}).Select(AssetDatabase.GUIDToAssetPath).ToList();
-
-            // keep only the assets inside a Resources folder, that is not inside an Editor folder
-            var rx = new Regex(@"\w*(?<!Editor\/)Resources\/", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-            allAssetPaths = allAssetPaths.Where(assetPath => (rx.IsMatch(assetPath))).ToList();
-
-            // find all the textures on which the assets from the Resources folder depend
-            foreach (var assetPath in allAssetPaths)
-            {
-                var assetDependencies = AssetDatabase.GetDependencies(assetPath, true);
-                foreach (var assetDependency in assetDependencies)
-                {
-                    if (AssetDatabase.GetMainAssetTypeAtPath(assetDependency) == typeof(Texture2D))
-                    {
-                        usedTexturePaths.Add(assetDependency);
-                    }
-                }
-            }
-
-            return usedTexturePaths.ToList();
+            return usedTexturePaths;
         }
 
         static void AnalyzeTextures()
         {
             _isAnalyzing = true;
-            if (OptimizerWindow.EditorWindowInstance != null)
-            {
-                OptimizerWindow.EditorWindowInstance.Repaint();
-            }
+            OptimizerWindow.EditorWindowInstance?.Repaint();
 
-            var usedTexturePaths = new HashSet<string>();
+            // Merge both sources without intermediate ToList + re-add to HashSet
+            var usedTexturePaths = GetUsedTexturesInBuildScenes();
+            usedTexturePaths.UnionWith(GetUsedTexturesInResources());
 
-            GetUsedTexturesInBuildScenes().ForEach(path => usedTexturePaths.Add(path));
-            GetUsedTexturesInResources().ForEach(path => usedTexturePaths.Add(path));
-
-            var treeElements = new List<TextureTreeItem>();
+            var treeElements = new List<TextureTreeItem>(usedTexturePaths.Count + 1);
             var idIncrement = 0;
-            var root = new TextureTreeItem("Root", -1, idIncrement, null, null);
-            treeElements.Add(root);
+            treeElements.Add(new TextureTreeItem("Root", -1, idIncrement, null, null));
 
             foreach (var texturePath in usedTexturePaths)
             {
                 if (texturePath.StartsWith("Packages/") && !_includeFilesFromPackages)
-                {
                     continue;
-                }
 
-                idIncrement++;
                 try
                 {
-                    var textureImporter = (TextureImporter) AssetImporter.GetAtPath(texturePath);
-                    treeElements.Add(new TextureTreeItem("Texture2D", 0, idIncrement, texturePath, textureImporter));
+                    var textureImporter = (TextureImporter)AssetImporter.GetAtPath(texturePath);
+                    treeElements.Add(new TextureTreeItem("Texture2D", 0, ++idIncrement, texturePath, textureImporter));
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
-                    Debug.LogWarning("Failed to analyze texture at path: " + texturePath);
+                    Debug.LogWarning($"Failed to analyze texture at path: {texturePath}\n{e.Message}");
                 }
             }
 
             var treeModel = new TreeModel<TextureTreeItem>(treeElements);
             var treeViewState = new TreeViewState();
-            if (_multiColumnHeaderState == null)
-                _multiColumnHeaderState = new MultiColumnHeaderState(new[]
-                {
-                    // when adding a new column don't forget to check the sorting method, and the CellGUI method
-                    new MultiColumnHeaderState.Column() {headerContent = new GUIContent() {text = "Texture"}, width = 150, minWidth = 150, canSort = true},
-                    new MultiColumnHeaderState.Column() {headerContent = new GUIContent() {text = "Type"}, width = 60, minWidth = 60, canSort = true},
-                    new MultiColumnHeaderState.Column() {headerContent = new GUIContent() {text = "Max size"}, width = 60, minWidth = 60, canSort = true},
-                    new MultiColumnHeaderState.Column() {headerContent = new GUIContent() {text = "Compression"}, width = 80, minWidth = 80, canSort = true},
-                    new MultiColumnHeaderState.Column()
-                        {headerContent = new GUIContent() {text = "Crunch compression"}, width = 120, minWidth = 120, canSort = true},
-                    new MultiColumnHeaderState.Column()
-                        {headerContent = new GUIContent() {text = "Crunch comp. quality"}, width = 128, minWidth = 128, canSort = true},
-                });
+
+            // Preserve column state across re-analyses; only create once
+            _multiColumnHeaderState ??= new MultiColumnHeaderState(new[]
+            {
+                // When adding a column, update SortIfNeeded and CellGUI too
+                new MultiColumnHeaderState.Column { headerContent = new GUIContent("Texture"),             width = 150, minWidth = 150, canSort = true },
+                new MultiColumnHeaderState.Column { headerContent = new GUIContent("Type"),                width = 60,  minWidth = 60,  canSort = true },
+                new MultiColumnHeaderState.Column { headerContent = new GUIContent("Max size"),            width = 60,  minWidth = 60,  canSort = true },
+                new MultiColumnHeaderState.Column { headerContent = new GUIContent("Compression"),         width = 80,  minWidth = 80,  canSort = true },
+                new MultiColumnHeaderState.Column { headerContent = new GUIContent("Crunch compression"),  width = 120, minWidth = 120, canSort = true },
+                new MultiColumnHeaderState.Column { headerContent = new GUIContent("Crunch comp. quality"), width = 128, minWidth = 128, canSort = true },
+            });
+
             _textureCompressionTree = new TextureTree(treeViewState, new MultiColumnHeader(_multiColumnHeaderState), treeModel);
             _isAnalyzing = false;
-            if (OptimizerWindow.EditorWindowInstance != null)
-            {
-                OptimizerWindow.EditorWindowInstance.Repaint();
-            }
+            OptimizerWindow.EditorWindowInstance?.Repaint();
         }
     }
 }

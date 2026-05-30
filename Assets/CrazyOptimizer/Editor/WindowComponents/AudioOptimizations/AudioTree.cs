@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using CrazyGames.TreeLib;
@@ -25,33 +25,26 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
                 return;
 
             if (multiColumnHeader.sortedColumnIndex == -1)
-            {
                 return; // No column to sort for (just use the order the data are in)
-            }
-
 
             var sortedColumns = multiColumnHeader.state.sortedColumns;
-
             if (sortedColumns.Length == 0)
                 return;
 
-            var items = rootItem.children.Cast<TreeViewItem<AudioTreeItem>>().OrderBy(i => i.data.AudioName);
             var sortedColumnIndex = sortedColumns[0];
             var ascending = multiColumnHeader.IsSortedAscending(sortedColumnIndex);
-            switch (sortedColumnIndex)
-            {
-                case 0:
-                    items = items.Order(i => i.data.AudioName, ascending);
-                    break;
-                case 1:
-                    items = items.Order(i => i.data.LoadType, ascending);
-                    break;
-                case 2:
-                    items = items.Order(i => i.data.Quality, ascending);
-                    break;
-            }
 
-            rootItem.children = items.Cast<TreeViewItem>().ToList();
+            // Cast once; the initial OrderBy on line 38 in the original was wasted work
+            // because the switch always overwrote it — now we sort directly.
+            IOrderedEnumerable<TreeViewItem<AudioTreeItem>> sorted = sortedColumnIndex switch
+            {
+                0 => rootItem.children.Cast<TreeViewItem<AudioTreeItem>>().Order(i => i.data.AudioName, ascending),
+                1 => rootItem.children.Cast<TreeViewItem<AudioTreeItem>>().Order(i => i.data.LoadType, ascending),
+                2 => rootItem.children.Cast<TreeViewItem<AudioTreeItem>>().Order(i => i.data.Quality, ascending),
+                _ => rootItem.children.Cast<TreeViewItem<AudioTreeItem>>().Order(i => i.data.AudioName, ascending)
+            };
+
+            rootItem.children = sorted.Cast<TreeViewItem>().ToList();
             TreeToList(root, rows);
             Repaint();
         }
@@ -59,16 +52,16 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
         public static void TreeToList(TreeViewItem root, IList<TreeViewItem> result)
         {
             if (root == null)
-                throw new NullReferenceException("root");
+                throw new ArgumentNullException(nameof(root));
             if (result == null)
-                throw new NullReferenceException("result");
+                throw new ArgumentNullException(nameof(result));
 
             result.Clear();
 
             if (root.children == null)
                 return;
 
-            Stack<TreeViewItem> stack = new Stack<TreeViewItem>();
+            Stack<TreeViewItem> stack = new();
             for (int i = root.children.Count - 1; i >= 0; i--)
                 stack.Push(root.children[i]);
 
@@ -80,13 +73,10 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
                 if (current.hasChildren && current.children[0] != null)
                 {
                     for (int i = current.children.Count - 1; i >= 0; i--)
-                    {
                         stack.Push(current.children[i]);
-                    }
                 }
             }
         }
-
 
         void OnSortingChanged(MultiColumnHeader multiColumnHeader)
         {
@@ -103,14 +93,11 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
         protected override void RowGUI(RowGUIArgs args)
         {
             var item = (TreeViewItem<AudioTreeItem>)args.item;
-
             for (int i = 0; i < args.GetNumVisibleColumns(); ++i)
-            {
                 CellGUI(args.GetCellRect(i), item, args.GetColumn(i), ref args);
-            }
         }
 
-        private void CellGUI(Rect cellRect, TreeViewItem<AudioTreeItem> item, int column, ref RowGUIArgs args)
+        void CellGUI(Rect cellRect, TreeViewItem<AudioTreeItem> item, int column, ref RowGUIArgs args)
         {
             CenterRectUsingSingleLineHeight(ref cellRect);
             switch (column)
@@ -122,6 +109,7 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
                     GUI.Label(cellRect, item.data.LoadType);
                     break;
                 case 2:
+                    // Quality is now an int property; convert once here
                     GUI.Label(cellRect, item.data.Quality.ToString());
                     break;
             }
@@ -130,7 +118,14 @@ namespace CrazyGames.WindowComponents.AudioOptimizations
         protected override void SelectionChanged(IList<int> selectedIds)
         {
             base.SelectionChanged(selectedIds);
-            var item = treeModel.Find(selectedIds.First());
+
+            if (selectedIds.Count == 0)
+                return;
+
+            var item = treeModel.Find(selectedIds[0]);
+            if (item == null)
+                return;
+
             Selection.activeObject = AssetDatabase.LoadMainAssetAtPath(item.AudioPath);
         }
     }

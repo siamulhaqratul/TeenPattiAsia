@@ -6,3 +6,6 @@ dotnet_diagnostic.IDE0031.severity = none
 
 # IDE0044: Add readonly modifier
 dotnet_diagnostic.IDE0044.severity = none
+
+# IDE1006: Naming rule violations
+dotnet_diagnostic.IDE1006.severity = none

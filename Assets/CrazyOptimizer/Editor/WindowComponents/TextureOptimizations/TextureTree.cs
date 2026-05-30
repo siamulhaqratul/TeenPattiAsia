@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using CrazyGames.TreeLib;
@@ -10,7 +10,8 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
 {
     class TextureTree : TreeViewWithTreeModel<TextureTreeItem>
     {
-        public TextureTree(TreeViewState treeViewState, MultiColumnHeader multiColumnHeader, TreeModel<TextureTreeItem> model)
+        public TextureTree(TreeViewState treeViewState, MultiColumnHeader multiColumnHeader,
+            TreeModel<TextureTreeItem> model)
             : base(treeViewState, multiColumnHeader, model)
         {
             showBorder = true;
@@ -25,42 +26,30 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
                 return;
 
             if (multiColumnHeader.sortedColumnIndex == -1)
-            {
                 return; // No column to sort for (just use the order the data are in)
-            }
-
 
             var sortedColumns = multiColumnHeader.state.sortedColumns;
-
             if (sortedColumns.Length == 0)
                 return;
 
-            var items = rootItem.children.Cast<TreeViewItem<TextureTreeItem>>().OrderBy(i => i.data.TextureName);
             var sortedColumnIndex = sortedColumns[0];
             var ascending = multiColumnHeader.IsSortedAscending(sortedColumnIndex);
-            switch (sortedColumnIndex)
-            {
-                case 0:
-                    items = items.Order(i => i.data.TextureName, ascending);
-                    break;
-                case 1:
-                    items = items.Order(i => i.data.TextureType, ascending);
-                    break;
-                case 2:
-                    items = items.Order(i => i.data.TextureMaxSize, ascending);
-                    break;
-                case 3:
-                    items = items.Order(i => i.data.TextureCompressionName, ascending);
-                    break;
-                case 4:
-                    items = items.Order(i => i.data.CrunchCompressionQuality, ascending);
-                    break;
-                case 5:
-                    items = items.Order(i => i.data.CrunchCompressionQuality, ascending);
-                    break;
-            }
 
-            rootItem.children = items.Cast<TreeViewItem>().ToList();
+            // Cast once; the original pre-sort by TextureName was immediately overwritten — removed.
+            // NOTE: original case 4 and 5 both sorted by CrunchCompressionQuality (bug);
+            //       case 4 should sort by HasCrunchCompression (the crunch on/off column).
+            IOrderedEnumerable<TreeViewItem<TextureTreeItem>> sorted = sortedColumnIndex switch
+            {
+                0 => rootItem.children.Cast<TreeViewItem<TextureTreeItem>>().Order(i => i.data.TextureName, ascending),
+                1 => rootItem.children.Cast<TreeViewItem<TextureTreeItem>>().Order(i => i.data.TextureType, ascending),
+                2 => rootItem.children.Cast<TreeViewItem<TextureTreeItem>>().Order(i => i.data.TextureMaxSize, ascending),
+                3 => rootItem.children.Cast<TreeViewItem<TextureTreeItem>>().Order(i => i.data.TextureCompressionName, ascending),
+                4 => rootItem.children.Cast<TreeViewItem<TextureTreeItem>>().Order(i => i.data.HasCrunchCompression, ascending),
+                5 => rootItem.children.Cast<TreeViewItem<TextureTreeItem>>().Order(i => i.data.CrunchCompressionQuality, ascending),
+                _ => rootItem.children.Cast<TreeViewItem<TextureTreeItem>>().Order(i => i.data.TextureName, ascending)
+            };
+
+            rootItem.children = sorted.Cast<TreeViewItem>().ToList();
             TreeToList(root, rows);
             Repaint();
         }
@@ -68,16 +57,16 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
         public static void TreeToList(TreeViewItem root, IList<TreeViewItem> result)
         {
             if (root == null)
-                throw new NullReferenceException("root");
+                throw new ArgumentNullException(nameof(root));
             if (result == null)
-                throw new NullReferenceException("result");
+                throw new ArgumentNullException(nameof(result));
 
             result.Clear();
 
             if (root.children == null)
                 return;
 
-            Stack<TreeViewItem> stack = new Stack<TreeViewItem>();
+            Stack<TreeViewItem> stack = new();
             for (int i = root.children.Count - 1; i >= 0; i--)
                 stack.Push(root.children[i]);
 
@@ -89,13 +78,10 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
                 if (current.hasChildren && current.children[0] != null)
                 {
                     for (int i = current.children.Count - 1; i >= 0; i--)
-                    {
                         stack.Push(current.children[i]);
-                    }
                 }
             }
         }
-
 
         void OnSortingChanged(MultiColumnHeader multiColumnHeader)
         {
@@ -111,15 +97,12 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
 
         protected override void RowGUI(RowGUIArgs args)
         {
-            var item = (TreeViewItem<TextureTreeItem>) args.item;
-
+            var item = (TreeViewItem<TextureTreeItem>)args.item;
             for (int i = 0; i < args.GetNumVisibleColumns(); ++i)
-            {
                 CellGUI(args.GetCellRect(i), item, args.GetColumn(i), ref args);
-            }
         }
 
-        private void CellGUI(Rect cellRect, TreeViewItem<TextureTreeItem> item, int column, ref RowGUIArgs args)
+        void CellGUI(Rect cellRect, TreeViewItem<TextureTreeItem> item, int column, ref RowGUIArgs args)
         {
             CenterRectUsingSingleLineHeight(ref cellRect);
             switch (column)
@@ -148,7 +131,14 @@ namespace CrazyGames.WindowComponents.TextureOptimizations
         protected override void SelectionChanged(IList<int> selectedIds)
         {
             base.SelectionChanged(selectedIds);
-            var item = treeModel.Find(selectedIds.First());
+
+            if (selectedIds.Count == 0)
+                return;
+
+            var item = treeModel.Find(selectedIds[0]);
+            if (item == null)
+                return;
+
             Selection.activeObject = AssetDatabase.LoadMainAssetAtPath(item.TexturePath);
         }
     }

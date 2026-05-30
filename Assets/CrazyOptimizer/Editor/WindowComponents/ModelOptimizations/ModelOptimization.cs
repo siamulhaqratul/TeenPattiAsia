@@ -1,6 +1,7 @@
 using CrazyGames.TreeLib;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using UnityEditor;
@@ -17,7 +18,13 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
         private static bool _isAnalyzing;
         private static bool _includeFilesFromPackages;
 
-        private static readonly List<string> _modelFormats = new List<string>() { ".fbx", ".dae", ".3ds", ".dxf", ".obj" };
+        // HashSet for O(1) extension lookups instead of O(n) List.Contains
+        private static readonly HashSet<string> ModelFormats =
+            new(StringComparer.OrdinalIgnoreCase) { ".fbx", ".dae", ".3ds", ".dxf", ".obj" };
+
+        // Compiled once at class-load time; was being re-compiled on every analysis call
+        private static readonly Regex ResourcesPathRegex =
+            new(@"\w*(?<!Editor\/)Resources\/", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         public static void RenderGUI()
         {
@@ -78,145 +85,100 @@ namespace CrazyGames.WindowComponents.ModelOptimizations
             EditorGUILayout.EndHorizontal();
         }
 
-        /**
-         * Find recursively the models on which this scene depends.
-         */
-        static List<string> GetSceneModelDependencies(string scenePath)
+        // Collect model dependencies of a scene directly into the destination set
+        static void CollectSceneModelDependencies(string scenePath, HashSet<string> result)
         {
-            var modelDependencies = new List<string>();
-            var assetDependencies = AssetDatabase.GetDependencies(scenePath, true);
-
-            foreach (var assetDependency in assetDependencies)
+            foreach (var dep in AssetDatabase.GetDependencies(scenePath, true))
             {
-                if (IsModelAtPath(assetDependency))
-                {
-                    modelDependencies.Add(assetDependency);
-                }
+                if (IsModelAtPath(dep))
+                    result.Add(dep);
             }
-
-            return modelDependencies;
         }
 
-        static List<string> GetUsedModelsInBuildScenes()
+        static HashSet<string> GetUsedModelsInBuildScenes()
         {
             var usedModelPaths = new HashSet<string>();
-            var scenesInBuild = OptimizerUtils.GetScenesInBuildPath();
-
-            foreach (var scenePath in scenesInBuild)
-            {
-                var modelsUsedInScene = GetSceneModelDependencies(scenePath);
-
-                foreach (var modelPath in modelsUsedInScene)
-                {
-                    usedModelPaths.Add(modelPath);
-                }
-            }
-
-            return usedModelPaths.ToList();
+            foreach (var scenePath in OptimizerUtils.GetScenesInBuildPath())
+                CollectSceneModelDependencies(scenePath, usedModelPaths);
+            return usedModelPaths;
         }
 
-        /**
-         * Get the list of models in the Resources folders, or on which assets from the Resources folder depend.
-         */
-        static List<string> GetUsedModelsInResources()
+        // Get models referenced by assets inside Resources folders (excluding Editor-only Resources).
+        static HashSet<string> GetUsedModelsInResources()
         {
             var usedModelPaths = new HashSet<string>();
-            var allAssetPaths = AssetDatabase.FindAssets("", new[] { "Assets" }).Select(AssetDatabase.GUIDToAssetPath).ToList();
 
-            // keep only the assets inside a Resources folder, that is not inside an Editor folder
-            var rx = new Regex(@"\w*(?<!Editor\/)Resources\/", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-            allAssetPaths = allAssetPaths.Where(assetPath => (rx.IsMatch(assetPath))).ToList();
+            // Keep only the assets inside a Resources folder that is not inside an Editor folder
+            var resourceAssets = AssetDatabase
+                .FindAssets("", new[] { "Assets" })
+                .Select(AssetDatabase.GUIDToAssetPath)
+                .Where(path => ResourcesPathRegex.IsMatch(path));
 
-            // find all the models on which the assets from the Resources folder depend
-            foreach (var assetPath in allAssetPaths)
+            foreach (var assetPath in resourceAssets)
             {
-                var assetDependencies = AssetDatabase.GetDependencies(assetPath, true);
-
-                foreach (var assetDependency in assetDependencies)
+                foreach (var dep in AssetDatabase.GetDependencies(assetPath, true))
                 {
-                    if (IsModelAtPath(assetDependency))
-                    {
-                        string ext = System.IO.Path.GetExtension(assetDependency);
-                        usedModelPaths.Add(assetDependency);
-                    }
+                    if (IsModelAtPath(dep))
+                        usedModelPaths.Add(dep);
                 }
             }
 
-            return usedModelPaths.ToList();
+            return usedModelPaths;
         }
 
-        static bool IsModelAtPath(string assetDependency)
+        static bool IsModelAtPath(string assetPath)
         {
-            return AssetDatabase.GetMainAssetTypeAtPath(assetDependency) == typeof(GameObject) &&
-                   _modelFormats.Contains(System.IO.Path.GetExtension(assetDependency).ToLowerInvariant());
+            return AssetDatabase.GetMainAssetTypeAtPath(assetPath) == typeof(GameObject) &&
+                   ModelFormats.Contains(Path.GetExtension(assetPath));
         }
 
         static void AnalyzeModels()
         {
             _isAnalyzing = true;
+            OptimizerWindow.EditorWindowInstance?.Repaint();
 
-            if (OptimizerWindow.EditorWindowInstance != null)
-            {
-                OptimizerWindow.EditorWindowInstance.Repaint();
-            }
+            // Merge both sources without intermediate ToList + re-add to HashSet
+            var usedModelPaths = GetUsedModelsInBuildScenes();
+            usedModelPaths.UnionWith(GetUsedModelsInResources());
 
-            var usedModelPaths = new HashSet<string>();
-
-            GetUsedModelsInBuildScenes().ForEach(path => usedModelPaths.Add(path));
-            GetUsedModelsInResources().ForEach(path => usedModelPaths.Add(path));
-
-            var treeElements = new List<ModelTreeItem>();
+            var treeElements = new List<ModelTreeItem>(usedModelPaths.Count + 1);
             var idIncrement = 0;
-            var root = new ModelTreeItem("Root", -1, idIncrement, null, null);
-            treeElements.Add(root);
+            treeElements.Add(new ModelTreeItem("Root", -1, idIncrement, null, null));
 
             foreach (var modelPath in usedModelPaths)
             {
                 if (modelPath.StartsWith("Packages/") && !_includeFilesFromPackages)
-                {
                     continue;
-                }
-
-                idIncrement++;
 
                 try
                 {
                     var modelImporter = (ModelImporter)AssetImporter.GetAtPath(modelPath);
-                    treeElements.Add(new ModelTreeItem("Model", 0, idIncrement, modelPath, modelImporter));
+                    treeElements.Add(new ModelTreeItem("Model", 0, ++idIncrement, modelPath, modelImporter));
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
-                    Debug.LogWarning("Failed to analyze model at path: " + modelPath);
+                    Debug.LogWarning($"Failed to analyze model at path: {modelPath}\n{e.Message}");
                 }
             }
 
             var treeModel = new TreeModel<ModelTreeItem>(treeElements);
             var treeViewState = new TreeViewState();
 
-            if (_multiColumnHeaderState == null)
-                _multiColumnHeaderState = new MultiColumnHeaderState(new[]
-                {
-                    // when adding a new column don't forget to check the sorting method, and the CellGUI method
-                    new MultiColumnHeaderState.Column() { headerContent = new GUIContent() { text = "Model" }, width = 150, minWidth = 150, canSort = true },
-                    new MultiColumnHeaderState.Column()
-                        { headerContent = new GUIContent() { text = "R/W enabled" }, width = 80, minWidth = 80, canSort = true },
-                    new MultiColumnHeaderState.Column()
-                        { headerContent = new GUIContent() { text = "Polygons optimized" }, width = 120, minWidth = 120, canSort = true },
-                    new MultiColumnHeaderState.Column()
-                        { headerContent = new GUIContent() { text = "Vertices optimized" }, width = 120, minWidth = 120, canSort = true },
-                    new MultiColumnHeaderState.Column()
-                        { headerContent = new GUIContent() { text = "Mesh compression" }, width = 120, minWidth = 120, canSort = true },
-                    new MultiColumnHeaderState.Column()
-                        { headerContent = new GUIContent() { text = "Animation compression" }, width = 140, minWidth = 140, canSort = true },
-                });
+            // Preserve column state across re-analyses; only create once
+            _multiColumnHeaderState ??= new MultiColumnHeaderState(new[]
+            {
+                // When adding a column, update SortIfNeeded and CellGUI too
+                new MultiColumnHeaderState.Column { headerContent = new GUIContent("Model"),                width = 150, minWidth = 150, canSort = true },
+                new MultiColumnHeaderState.Column { headerContent = new GUIContent("R/W enabled"),         width = 80,  minWidth = 80,  canSort = true },
+                new MultiColumnHeaderState.Column { headerContent = new GUIContent("Polygons optimized"),  width = 120, minWidth = 120, canSort = true },
+                new MultiColumnHeaderState.Column { headerContent = new GUIContent("Vertices optimized"),  width = 120, minWidth = 120, canSort = true },
+                new MultiColumnHeaderState.Column { headerContent = new GUIContent("Mesh compression"),    width = 120, minWidth = 120, canSort = true },
+                new MultiColumnHeaderState.Column { headerContent = new GUIContent("Animation compression"), width = 140, minWidth = 140, canSort = true },
+            });
 
             _modelTree = new ModelTree(treeViewState, new MultiColumnHeader(_multiColumnHeaderState), treeModel);
             _isAnalyzing = false;
-
-            if (OptimizerWindow.EditorWindowInstance != null)
-            {
-                OptimizerWindow.EditorWindowInstance.Repaint();
-            }
+            OptimizerWindow.EditorWindowInstance?.Repaint();
         }
     }
 }
