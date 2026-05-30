@@ -1,0 +1,8 @@
+root = true
+
+[*.cs]
+# IDE0031: Use conditional access
+dotnet_diagnostic.IDE0031.severity = none
+
+# IDE0044: Add readonly modifier
+dotnet_diagnostic.IDE0044.severity = none

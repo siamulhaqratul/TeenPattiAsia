@@ -1,93 +1,96 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-[ExecuteAlways]
-[RequireComponent(typeof(RectTransform))]
-[RequireComponent(typeof(RectMask2D))]
-public class DynamicViewport : MonoBehaviour
+namespace TeenPattiAsia.Game
 {
-    [Tooltip("Percentage of the screen height the game viewport should occupy (0.0 to 1.0)")]
-    [Range(0f, 1f)]
-    [SerializeField] private float heightPercentage = 0.6f;
-
-    [Tooltip("Fixed width of the game viewport in canvas units")]
-    [SerializeField] private float fixedWidth = 1080f;
-
-    private RectTransform rectTransform;
-
-    private void Awake()
+    [ExecuteAlways]
+    [RequireComponent(typeof(RectTransform))]
+    [RequireComponent(typeof(RectMask2D))]
+    public class DynamicViewport : MonoBehaviour
     {
-        rectTransform = GetComponent<RectTransform>();
-        EnsureMaskComponent();
-        UpdateLayout();
-    }
+        [Tooltip("Percentage of the screen height the game viewport should occupy (0.0 to 1.0)")]
+        [Range(0f, 1f)]
+        [SerializeField] private float heightPercentage = 0.6f;
 
-    private void OnValidate()
-    {
-        if (rectTransform == null)
+        [Tooltip("Fixed width of the game viewport in canvas units")]
+        [SerializeField] private float fixedWidth = 1080f;
+
+        private RectTransform rectTransform;
+
+        protected void Awake()
         {
             rectTransform = GetComponent<RectTransform>();
-        }
-        EnsureMaskComponent();
-        UpdateLayout();
-    }
-
-    private void EnsureMaskComponent()
-    {
-        if (GetComponent<RectMask2D>() == null)
-        {
-            gameObject.AddComponent<RectMask2D>();
-        }
-    }
-
-    private void Update()
-    {
-        // Keep updated in editor when screen aspect ratio changes
-        #if UNITY_EDITOR
-        if (!Application.isPlaying)
-        {
+            EnsureMaskComponent();
             UpdateLayout();
         }
-        #endif
-    }
 
-    /// <summary>
-    /// Programmatically changes the height percentage of the game container.
-    /// Useful for responding to runtime socket/API events.
-    /// </summary>
-    public void SetHeightPercentage(float percentage)
-    {
-        heightPercentage = Mathf.Clamp01(percentage);
-        UpdateLayout();
-    }
+        protected void OnValidate()
+        {
+            if (rectTransform == null)
+            {
+                rectTransform = GetComponent<RectTransform>();
+            }
+            EnsureMaskComponent();
+            UpdateLayout();
+        }
 
-    /// <summary>
-    /// Programmatically changes the fixed width of the game container.
-    /// </summary>
-    public void SetFixedWidth(float width)
-    {
-        fixedWidth = Mathf.Max(0f, width);
-        UpdateLayout();
-    }
+        private void EnsureMaskComponent()
+        {
+            if (GetComponent<RectMask2D>() == null)
+            {
+                gameObject.AddComponent<RectMask2D>();
+            }
+        }
 
-    /// <summary>
-    /// Forces an update of the RectTransform to respect current heightPercentage and fixedWidth.
-    /// </summary>
-    public void UpdateLayout()
-    {
-        if (rectTransform == null) return;
+        protected void Update()
+        {
+            // Keep updated in editor when screen aspect ratio changes
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                UpdateLayout();
+            }
+#endif
+        }
 
-        // Anchor at bottom-center (Min Y=0, Max Y=heightPercentage)
-        rectTransform.anchorMin = new Vector2(0.5f, 0f);
-        rectTransform.anchorMax = new Vector2(0.5f, heightPercentage);
+        /// <summary>
+        /// Programmatically changes the height percentage of the game container.
+        /// Useful for responding to runtime socket/API events.
+        /// </summary>
+        public void SetHeightPercentage(float percentage)
+        {
+            heightPercentage = Mathf.Clamp01(percentage);
+            UpdateLayout();
+        }
 
-        // Pivot at bottom-center
-        rectTransform.pivot = new Vector2(0.5f, 0f);
+        /// <summary>
+        /// Programmatically changes the fixed width of the game container.
+        /// </summary>
+        public void SetFixedWidth(float width)
+        {
+            fixedWidth = Mathf.Max(0f, width);
+            UpdateLayout();
+        }
 
-        // Fixed width, height is driven entirely by Y anchors
-        rectTransform.sizeDelta = new Vector2(fixedWidth, 0f);
+        /// <summary>
+        /// Forces an update of the RectTransform to respect current heightPercentage and fixedWidth.
+        /// </summary>
+        public void UpdateLayout()
+        {
+            if (rectTransform == null) return;
 
-        // Reset relative position to be centered at the bottom
-        rectTransform.anchoredPosition = Vector2.zero;
+            // Anchor at bottom-center (Min Y=0, Max Y=heightPercentage)
+            rectTransform.anchorMin = new Vector2(0.5f, 0f);
+            rectTransform.anchorMax = new Vector2(0.5f, heightPercentage);
+
+            // Pivot at bottom-center
+            rectTransform.pivot = new Vector2(0.5f, 0f);
+
+            // Fixed width, height is driven entirely by Y anchors
+            rectTransform.sizeDelta = new Vector2(fixedWidth, 0f);
+
+            // Reset relative position to be centered at the bottom
+            rectTransform.anchoredPosition = Vector2.zero;
+        }
     }
 }
