@@ -292,7 +292,7 @@ namespace AntigravityEditor
             if (extension == ".dll")
                 return true;
 
-            if (file.ToLower().EndsWith(".asmdef"))
+            if (file.EndsWith(".asmdef", StringComparison.OrdinalIgnoreCase))
                 return true;
 
             return IsSupportedExtension(extension);
