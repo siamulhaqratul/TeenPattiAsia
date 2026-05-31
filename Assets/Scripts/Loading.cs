@@ -8,13 +8,17 @@ namespace TeenPattiAsia.Game
     {
         public enum LoadingDisplayMode
         {
-            AlwaysShow,            // Show loading screen on every scene load
-            OncePerSession,        // Show only on the first load of a session (resets on app restart)
-            OnceEver              // Show only on the very first run of the game (persists in PlayerPrefs)
+            AlwaysShow,         // Show loading screen on every scene load
+            OncePerSession,     // Show only on the first load of a session (resets on app restart)
+            OnceEver            // Show only on the very first run of the game (persists in PlayerPrefs)
         }
 
+        private const string k_HasLaunchedKey = "HasLaunchedBefore";
+
         #region Variables
-        public static Loading Instance;
+
+        // Exposed as read-only property; setter is private to prevent external mutation.
+        public static Loading Instance { get; private set; }
 
         [Header("UI References")]
         [SerializeField] private Image _fillMask = null;
@@ -23,19 +27,20 @@ namespace TeenPattiAsia.Game
 
         [Header("Settings")]
         [SerializeField, Tooltip("Loading Time In Seconds"), Range(0.1f, 10f)]
-
         private float _loadingTime = 1.0f;
 
         [SerializeField, Tooltip("How often the loading screen should be shown")]
         private LoadingDisplayMode _displayMode = LoadingDisplayMode.OncePerSession;
 
-        private static bool _hasLoadedThisSession = false;
+        // Static state survives scene loads but resets on domain reload (editor play-mode).
+        private static bool _hasLoadedThisSession;
         private float _originalVolume = 1f;
+
         #endregion
 
         #region Unity Methods
 
-        private void Awake()
+        protected void Awake()
         {
             if (Instance == null)
             {
@@ -48,13 +53,9 @@ namespace TeenPattiAsia.Game
             }
 
             if (ShouldShowLoading())
-            {
                 StartCoroutine(StartLoadingProcess());
-            }
             else
-            {
                 BypassLoading();
-            }
         }
 
         #endregion
@@ -63,55 +64,36 @@ namespace TeenPattiAsia.Game
 
         private bool ShouldShowLoading()
         {
-            switch (_displayMode)
+            return _displayMode switch
             {
-                case LoadingDisplayMode.AlwaysShow:
-                    return true;
-
-                case LoadingDisplayMode.OncePerSession:
-                    return !_hasLoadedThisSession;
-
-                case LoadingDisplayMode.OnceEver:
-                    return PlayerPrefs.GetInt("HasLaunchedBefore", 0) == 0;
-
-                default:
-                    return true;
-            }
+                LoadingDisplayMode.AlwaysShow      => true,
+                LoadingDisplayMode.OncePerSession  => !_hasLoadedThisSession,
+                LoadingDisplayMode.OnceEver        => PlayerPrefs.GetInt(k_HasLaunchedKey, 0) == 0,
+                _                                  => true,
+            };
         }
 
         private void BypassLoading()
         {
-            if (loadingImage != null)
-
-            {
-                loadingImage.SetActive(false);
-            }
+            loadingImage?.SetActive(false);
             // Do not force/overwrite AudioListener.volume here to avoid disrupting current audio states.
         }
 
         private IEnumerator StartLoadingProcess()
         {
-            // Cache current volume before muting to respect system/user settings
+            // Cache current volume before muting to respect system/user settings.
             _originalVolume = AudioListener.volume;
             AudioListener.volume = 0f;
 
-            if (loadingImage != null)
+            loadingImage?.SetActive(true);
 
-            {
-                loadingImage.SetActive(true);
-            }
+            // Avoid division by zero for very small loading times.
+            float duration = Mathf.Max(0.01f, _loadingTime);
 
             if (_fillMask != null)
-
             {
                 _fillMask.fillAmount = 0f;
-            }
-
-            float elapsed = 0f;
-            float duration = Mathf.Max(0.01f, _loadingTime); // Avoid division by zero
-
-            if (_fillMask != null)
-            {
+                float elapsed = 0f;
                 while (elapsed < duration)
                 {
                     elapsed += Time.deltaTime;
@@ -122,26 +104,19 @@ namespace TeenPattiAsia.Game
             }
             else
             {
-                while (elapsed < duration)
-                {
-                    elapsed += Time.deltaTime;
-                    yield return null;
-                }
+                yield return new WaitForSeconds(duration);
             }
 
-            if (loadingImage != null)
-            {
-                loadingImage.SetActive(false);
-            }
+            loadingImage?.SetActive(false);
 
-            // Restore original audio volume
+            // Restore original audio volume.
             AudioListener.volume = _originalVolume;
 
-            // Record that we have successfully loaded at least once
+            // Record that we have successfully loaded at least once.
             _hasLoadedThisSession = true;
             if (_displayMode == LoadingDisplayMode.OnceEver)
             {
-                PlayerPrefs.SetInt("HasLaunchedBefore", 1);
+                PlayerPrefs.SetInt(k_HasLaunchedKey, 1);
                 PlayerPrefs.Save();
             }
         }

@@ -10,46 +10,36 @@ namespace TeenPattiAsia.Game
     {
         [Tooltip("Percentage of the screen height the game viewport should occupy (0.0 to 1.0)")]
         [Range(0f, 1f)]
-        [SerializeField] private float heightPercentage = 0.6f;
+        [SerializeField] private float heightPercentage = 0.5f;
 
         [Tooltip("Fixed width of the game viewport in canvas units")]
         [SerializeField] private float fixedWidth = 1080f;
 
-        private RectTransform rectTransform;
+        // Cached in Awake — never null at runtime because [RequireComponent] guarantees it.
+        private RectTransform _rectTransform;
 
         protected void Awake()
         {
-            rectTransform = GetComponent<RectTransform>();
-            EnsureMaskComponent();
+            _rectTransform = GetComponent<RectTransform>();
             UpdateLayout();
         }
 
         protected void OnValidate()
         {
-            if (rectTransform == null)
-            {
-                rectTransform = GetComponent<RectTransform>();
-            }
-            EnsureMaskComponent();
+            // OnValidate can run before Awake in the editor, so guard with null check.
+            if (_rectTransform == null)
+                _rectTransform = GetComponent<RectTransform>();
+
             UpdateLayout();
         }
 
-        private void EnsureMaskComponent()
-        {
-            if (GetComponent<RectMask2D>() == null)
-            {
-                gameObject.AddComponent<RectMask2D>();
-            }
-        }
-
+        // [ExecuteAlways] + Update() fires every editor frame.
+        // Only run in editor while not playing; at runtime layout is static unless explicitly changed.
         protected void Update()
         {
-            // Keep updated in editor when screen aspect ratio changes
 #if UNITY_EDITOR
             if (!Application.isPlaying)
-            {
                 UpdateLayout();
-            }
 #endif
         }
 
@@ -77,20 +67,20 @@ namespace TeenPattiAsia.Game
         /// </summary>
         public void UpdateLayout()
         {
-            if (rectTransform == null) return;
+            if (_rectTransform == null) return;
 
-            // Anchor at bottom-center (Min Y=0, Max Y=heightPercentage)
-            rectTransform.anchorMin = new Vector2(0.5f, 0f);
-            rectTransform.anchorMax = new Vector2(0.5f, heightPercentage);
+            // Anchor at bottom-center: Y spans from 0 → heightPercentage of parent.
+            _rectTransform.anchorMin = new Vector2(0.5f, 0f);
+            _rectTransform.anchorMax = new Vector2(0.5f, heightPercentage);
 
-            // Pivot at bottom-center
-            rectTransform.pivot = new Vector2(0.5f, 0f);
+            // Pivot at bottom-center so anchoredPosition = zero means flush to bottom.
+            _rectTransform.pivot = new Vector2(0.5f, 0f);
 
-            // Fixed width, height is driven entirely by Y anchors
-            rectTransform.sizeDelta = new Vector2(fixedWidth, 0f);
+            // Fixed width; height is driven entirely by the Y anchors.
+            _rectTransform.sizeDelta = new Vector2(fixedWidth, 0f);
 
-            // Reset relative position to be centered at the bottom
-            rectTransform.anchoredPosition = Vector2.zero;
+            // Reset relative position to be centered horizontally at the bottom.
+            _rectTransform.anchoredPosition = Vector2.zero;
         }
     }
 }

@@ -8,29 +8,33 @@ namespace TeenPattiAsia.Editor
 {
     public static class GameSetup
     {
-        [MenuItem("Tools/Setup 60% Bottom UI")]
-        [System.Obsolete]
-
+        // "%" in a MenuItem path is Unity's shortcut prefix (Ctrl/Cmd), so "Setup % Bottom UI"
+        // would register as Ctrl+B. Use a plain name to avoid accidental shortcut binding.
+        [MenuItem("Tools/Setup Bottom UI (50%)")]
         public static void SetupBottomUI()
         {
-            // 1. Get or Load the current scene
-            var scene = EditorSceneManager.GetActiveScene();
+            // Group all operations into a single undoable action.
+            Undo.IncrementCurrentGroup();
+            Undo.SetCurrentGroupName("Setup Bottom UI");
+            int undoGroup = Undo.GetCurrentGroup();
 
-            // 2. Find Canvas in the scene
-
+            // 1. Find or create Canvas.
+#if UNITY_2023_1_OR_NEWER
+            Canvas canvas = Object.FindFirstObjectByType<Canvas>();
+#else
             Canvas canvas = Object.FindObjectOfType<Canvas>();
+#endif
             if (canvas == null)
             {
-                // If no canvas exists, create one
                 GameObject canvasGO = new("Canvas");
+                Undo.RegisterCreatedObjectUndo(canvasGO, "Create Canvas");
                 canvas = canvasGO.AddComponent<Canvas>();
                 canvas.renderMode = RenderMode.ScreenSpaceOverlay;
                 canvasGO.AddComponent<CanvasScaler>();
                 canvasGO.AddComponent<GraphicRaycaster>();
-                Undo.RegisterCreatedObjectUndo(canvasGO, "Create Canvas");
             }
 
-            // 3. Configure CanvasScaler
+            // 2. Configure CanvasScaler.
             CanvasScaler scaler = canvas.GetComponent<CanvasScaler>();
             if (scaler != null)
             {
@@ -38,10 +42,10 @@ namespace TeenPattiAsia.Editor
                 scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
                 scaler.referenceResolution = new Vector2(1080, 1920);
                 scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-                scaler.matchWidthOrHeight = 0f; // Match width to keep fixed width aspect correct
+                scaler.matchWidthOrHeight = 0f; // Match width for fixed-width aspect.
             }
 
-            // 4. Find or Create GameContainer
+            // 3. Find or create GameContainer.
             Transform gameContainerTransform = canvas.transform.Find("GameContainer");
             GameObject gameContainerGO;
             if (gameContainerTransform != null)
@@ -52,51 +56,47 @@ namespace TeenPattiAsia.Editor
             else
             {
                 gameContainerGO = new GameObject("GameContainer");
-                gameContainerGO.transform.SetParent(canvas.transform, false);
                 Undo.RegisterCreatedObjectUndo(gameContainerGO, "Create Game Container");
+                gameContainerGO.transform.SetParent(canvas.transform, false);
             }
 
-            // 5. Setup DynamicViewport and RectMask2D for GameContainer
+            // 4. Ensure DynamicViewport (also guarantees RectTransform + RectMask2D via [RequireComponent]).
             DynamicViewport viewport = gameContainerGO.GetComponent<DynamicViewport>();
             if (viewport == null)
             {
-                viewport = gameContainerGO.AddComponent<DynamicViewport>();
-                Undo.RegisterCreatedObjectUndo(viewport, "Add DynamicViewport Component");
+                viewport = Undo.AddComponent<DynamicViewport>(gameContainerGO);
             }
-
-
-            RectMask2D mask = gameContainerGO.GetComponent<RectMask2D>();
-            if (mask == null)
-            {
-                mask = gameContainerGO.AddComponent<RectMask2D>();
-                Undo.RegisterCreatedObjectUndo(mask, "Add RectMask2D Component");
-            }
-
             viewport.UpdateLayout();
 
-            // 6. Add an Image for visualization
+            // 5. Add a semi-transparent Image for editor visualization.
             Image img = gameContainerGO.GetComponent<Image>();
             if (img == null)
             {
-                img = gameContainerGO.AddComponent<Image>();
-                // Semi-transparent dark color for testing
+                img = Undo.AddComponent<Image>(gameContainerGO);
                 img.color = new Color(0.1f, 0.1f, 0.1f, 1f);
             }
 
-            // 7. Make sure EventSystem is present
-            if (Object.FindObjectOfType<UnityEngine.EventSystems.EventSystem>() == null)
+            // 6. Ensure EventSystem is present.
+#if UNITY_2023_1_OR_NEWER
+            bool hasEventSystem = Object.FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>() != null;
+#else
+            bool hasEventSystem = Object.FindObjectOfType<UnityEngine.EventSystems.EventSystem>() != null;
+#endif
+            if (!hasEventSystem)
             {
                 GameObject esGO = new("EventSystem");
+                Undo.RegisterCreatedObjectUndo(esGO, "Create EventSystem");
                 esGO.AddComponent<UnityEngine.EventSystems.EventSystem>();
                 esGO.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
-                Undo.RegisterCreatedObjectUndo(esGO, "Create EventSystem");
             }
 
-            // Mark the scene as dirty so the user can save it
-            EditorSceneManager.MarkSceneDirty(scene);
+            // Collapse all recorded operations into a single undo step.
+            Undo.CollapseUndoOperations(undoGroup);
 
+            // Mark the scene dirty so the user is prompted to save.
+            EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
 
-            Debug.Log("Game Setup complete! Bottom 60% layout initialized with fixed width 1080.");
+            Debug.Log("[GameSetup] Bottom UI setup complete — 60% height, 1080px fixed width.");
         }
     }
 }
