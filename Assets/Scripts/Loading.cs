@@ -22,8 +22,8 @@ namespace TeenPattiAsia.Game
 
         [Header("UI References")]
         [SerializeField] private Image _fillMask = null;
-        [Tooltip("The main loading screen container GameObject")]
-        public GameObject loadingImage;
+        [SerializeField, Tooltip("The main loading screen container GameObject")]
+        private GameObject loadingImage = null;
 
         [Header("Settings")]
         [SerializeField, Tooltip("Loading Time In Seconds"), Range(0.1f, 10f)]
@@ -35,6 +35,7 @@ namespace TeenPattiAsia.Game
         // Static state survives scene loads but resets on domain reload (editor play-mode).
         private static bool _hasLoadedThisSession;
         private float _originalVolume = 1f;
+        private WaitForSeconds _loadingWait;
 
         #endregion
 
@@ -51,6 +52,13 @@ namespace TeenPattiAsia.Game
                 Destroy(gameObject);
                 return;
             }
+
+            if (_fillMask != null)
+            {
+                _fillMask.raycastTarget = false;
+            }
+
+            _loadingWait = new WaitForSeconds(Mathf.Max(0.01f, _loadingTime));
 
             if (ShouldShowLoading())
                 StartCoroutine(StartLoadingProcess());
@@ -104,7 +112,7 @@ namespace TeenPattiAsia.Game
             }
             else
             {
-                yield return new WaitForSeconds(duration);
+                yield return _loadingWait;
             }
 
             loadingImage?.SetActive(false);

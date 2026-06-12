@@ -35,8 +35,7 @@ namespace TeenPattiAsia.Editor
             }
 
             // 2. Configure CanvasScaler.
-            CanvasScaler scaler = canvas.GetComponent<CanvasScaler>();
-            if (scaler != null)
+            if (canvas.TryGetComponent<CanvasScaler>(out var scaler))
             {
                 Undo.RecordObject(scaler, "Configure Canvas Scaler");
                 scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -61,19 +60,18 @@ namespace TeenPattiAsia.Editor
             }
 
             // 4. Ensure DynamicViewport (also guarantees RectTransform + RectMask2D via [RequireComponent]).
-            DynamicViewport viewport = gameContainerGO.GetComponent<DynamicViewport>();
-            if (viewport == null)
+            if (!gameContainerGO.TryGetComponent<DynamicViewport>(out var viewport))
             {
                 viewport = Undo.AddComponent<DynamicViewport>(gameContainerGO);
             }
             viewport.UpdateLayout();
 
             // 5. Add a semi-transparent Image for editor visualization.
-            Image img = gameContainerGO.GetComponent<Image>();
-            if (img == null)
+            if (!gameContainerGO.TryGetComponent<Image>(out var img))
             {
                 img = Undo.AddComponent<Image>(gameContainerGO);
                 img.color = new Color(0.1f, 0.1f, 0.1f, 1f);
+                img.raycastTarget = false;
             }
 
             // 6. Ensure EventSystem is present.

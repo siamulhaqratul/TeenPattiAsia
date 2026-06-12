@@ -20,7 +20,7 @@ namespace TeenPattiAsia.Game
 
         protected void Awake()
         {
-            _rectTransform = GetComponent<RectTransform>();
+            TryGetComponent<RectTransform>(out _rectTransform);
             UpdateLayout();
         }
 
@@ -28,20 +28,20 @@ namespace TeenPattiAsia.Game
         {
             // OnValidate can run before Awake in the editor, so guard with null check.
             if (_rectTransform == null)
-                _rectTransform = GetComponent<RectTransform>();
+                TryGetComponent<RectTransform>(out _rectTransform);
 
             UpdateLayout();
         }
 
+#if UNITY_EDITOR
         // [ExecuteAlways] + Update() fires every editor frame.
         // Only run in editor while not playing; at runtime layout is static unless explicitly changed.
         protected void Update()
         {
-#if UNITY_EDITOR
             if (!Application.isPlaying)
                 UpdateLayout();
-#endif
         }
+#endif
 
         /// <summary>
         /// Programmatically changes the height percentage of the game container.
